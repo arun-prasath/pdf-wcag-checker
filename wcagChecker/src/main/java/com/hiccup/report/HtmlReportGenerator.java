@@ -1,11 +1,13 @@
-package com.hiccup;
+package com.hiccup.report;
 
 import java.io.*;
 import java.util.List;
 
+import com.hiccup.model.AccessibilityIssue;
+
 public class HtmlReportGenerator {
 
-    public static void generate(List<AccessibilityIssue> issues, File output)
+    public static void generate(List<AccessibilityIssue> issues, File pdf, File output)
             throws IOException {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(output))) {
@@ -26,6 +28,14 @@ public class HtmlReportGenerator {
                 </head>
                 <body>
                 <h1>WCAG 2.1 Accessibility Report</h1>
+                """);
+            
+            writer.write(String.format(
+                    "<h2>File: %s</h2>",
+                    pdf.getName()
+            ));
+            
+            writer.write("""
                 <table>
                   <tr>
                     <th>WCAG Criterion</th>
@@ -38,11 +48,11 @@ public class HtmlReportGenerator {
             for (AccessibilityIssue issue : issues) {
                 writer.write(String.format(
                         "<tr><td>%s</td><td>%s</td><td>%s</td><td class='%s'>%s</td></tr>",
-                        issue.wcagCriterion,
-                        issue.level,
-                        issue.description,
-                        issue.status,
-                        issue.status
+                        issue.getWcagCriterion(),
+                        issue.getLevel(),
+                        issue.getDescription(),
+                        issue.getStatus(),
+                        issue.getStatus()
                 ));
             }
 
