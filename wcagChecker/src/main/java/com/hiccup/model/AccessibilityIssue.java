@@ -1,5 +1,7 @@
 package com.hiccup.model;
 
+import java.util.Objects;
+
 public class AccessibilityIssue {
     private String wcagCriterion;
     private String level;
@@ -44,6 +46,23 @@ public class AccessibilityIssue {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(wcagCriterion);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		AccessibilityIssue other = (AccessibilityIssue) obj;
+		return Objects.equals(wcagCriterion, other.wcagCriterion);
 	}
 
 }

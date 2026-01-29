@@ -2,6 +2,7 @@ package com.hiccup.validator;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -14,6 +15,7 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 import org.apache.pdfbox.text.PDFTextStripper;
 
 import com.hiccup.model.AccessibilityIssue;
+
 
 public class PdfWcagValidator {
 
@@ -55,17 +57,29 @@ public class PdfWcagValidator {
                     }
                 }
 
+                issues.add(new AccessibilityIssue("1.3.1", "A",
+                		"List structure present",
+                		hasList ? "PASS" : "WARN"));
+                
+                issues.add(new AccessibilityIssue("1.3.1", "A",
+                		"Table structure present",
+                		hasTable ? "PASS" : "WARN"));
+
                 issues.add(new AccessibilityIssue("2.4.6", "AA",
                         "Headings present for navigation",
                         hasHeading ? "PASS" : "FAIL"));
 
-                issues.add(new AccessibilityIssue("1.3.1", "A",
-                        "List structure present",
-                        hasList ? "PASS" : "WARN"));
+            }
 
-                issues.add(new AccessibilityIssue("1.3.1", "A",
-                        "Table structure present",
-                        hasTable ? "PASS" : "WARN"));
+            /* ---------------- WCAG 1.4.5 – Images of Text ---------------- */
+
+            PDFTextStripper stripper = new PDFTextStripper();
+            String extractedText = stripper.getText(document);
+            if (extractedText.trim().isEmpty()) {
+                issues.add(new AccessibilityIssue(
+                        "1.4.5", "AA",
+                        "PDF appears image-only (likely scanned)",
+                        "FAIL"));
             }
 
             /* ---------------- WCAG 2.4.2 – Page Titled ---------------- */
@@ -85,9 +99,6 @@ public class PdfWcagValidator {
                     (lang == null || lang.isBlank()) ? "FAIL" : "PASS"));
 
             /* ---------------- WCAG 1.4.4 – Resize Text ---------------- */
-
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extractedText = stripper.getText(document);
 
             issues.add(new AccessibilityIssue(
                     "1.4.4", "AA",
@@ -143,6 +154,8 @@ public class PdfWcagValidator {
                     "Bookmarks present for navigation",
                     outline == null ? "WARN" : "PASS"));
         }
+
+        issues.sort(Comparator.comparing(AccessibilityIssue::getWcagCriterion));
 
         return issues;
     }
