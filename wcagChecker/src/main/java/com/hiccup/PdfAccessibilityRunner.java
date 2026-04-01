@@ -18,4 +18,5 @@ public class PdfAccessibilityRunner {
 
         System.out.println("WCAG accessibility report generated: " + report.getAbsolutePath());
     }
+
 }
