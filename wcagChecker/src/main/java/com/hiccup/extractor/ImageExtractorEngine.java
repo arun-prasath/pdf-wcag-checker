@@ -1,9 +1,9 @@
 package com.hiccup.extractor;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -26,7 +26,7 @@ public class ImageExtractorEngine extends PDFStreamEngine {
     private Map<Integer, String> mcidToAlt;
 
     // Stack to track nested marked content
-    private Deque<Integer> mcidStack = new ArrayDeque<>();
+    private Deque<Integer> mcidStack = new LinkedList<>();
 
     public ImageExtractorEngine(int pageNumber, Map<Integer, String> mcidToAlt) {
         this.pageNumber = pageNumber;
@@ -103,4 +103,5 @@ public class ImageExtractorEngine extends PDFStreamEngine {
             ));
         }
     }
+
 }

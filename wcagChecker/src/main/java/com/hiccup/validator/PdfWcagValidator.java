@@ -1,6 +1,5 @@
 package com.hiccup.validator;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -8,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
@@ -31,26 +29,10 @@ import com.hiccup.model.ImageAltData;
 
 public class PdfWcagValidator {
 
-	private static final List<String> VIOLENCE_KEYWORDS = List.of(
-		"murder", "killing", "kill", "homicide",
-		"execution", "beheading", "decapitation",
-		"stabbing", "stabbed", "knife attack",
-		"shooting", "gunshot", "gunfire",
-		"assault", "brutal attack",
-		"torture", "tortured",
-		"bloodshed", "gory", "gore",
-		"dead body", "corpse", "lifeless body",
-		"massacre", "slaughter",
-		"fatal injury", "fatal wound",
-		"blood", "violence", "injury",
-		"weapon", "gun"
-	);
-
-    public static List<AccessibilityIssue> validate(File pdfFile) throws Exception {
+    public static List<AccessibilityIssue> validate(PDDocument document) throws Exception {
 
         List<AccessibilityIssue> issues = new ArrayList<>();
 
-        try (PDDocument document = PDDocument.load(pdfFile)) {
 
             PDDocumentCatalog catalog = document.getDocumentCatalog();
             PDStructureTreeRoot structureRoot = catalog.getStructureTreeRoot();
@@ -230,7 +212,7 @@ public class PdfWcagValidator {
                 issues.add(new AccessibilityIssue(
                         "1.1.1", "A",
                         "Images detected in document: " + totalImages,
-                        "WARN"));
+                        "INFO"));
             }
 
             /* ---------------- Image-only PDF ---------------- */
@@ -260,21 +242,12 @@ public class PdfWcagValidator {
 
             /* ---------------- Large Image Detection ---------------- */
 
-            if (largeImages > 0) {
+            /*if (largeImages > 0) {
                 issues.add(new AccessibilityIssue(
                         "1.1.1", "A",
                         "Large images detected (" + largeImages + ") → likely require meaningful alt text",
                         "WARN"));
-            }
-
-            /* ---------------- Repeated Images ---------------- */
-
-            if (totalImages > 1 && imageHashes.size() < totalImages) {
-                issues.add(new AccessibilityIssue(
-                        "Best Practice", "-",
-                        "Repeated images detected → verify decorative usage or consistent alt text",
-                        "WARN"));
-            }
+            }*/
 
             /* ---------------- Images used as text (Heuristic) ---------------- */
 
@@ -304,33 +277,28 @@ public class PdfWcagValidator {
                         "WARN"));
             }
 
-
-            /* ---------------- Image validation based on ALT text ---------------- */
-
-            String altText = extractAltText(structureRoot); // custom method
-
-            String result = checkAltText(altText);
-
-            if ("FAIL".equals(result)) {
-                issues.add(new AccessibilityIssue(
-                        "Content Safety",
-                        "-",
-                        "ALT text indicates explicit/inappropriate content: " + altText,
-                        "FAIL"));
-            } else if ("WARN".equals(result)) {
-                issues.add(new AccessibilityIssue(
-                        "Content Safety",
-                        "-",
-                        "ALT text may indicate suggestive or sensitive content: " + altText,
-                        "WARN"));
-            }
+            /* ---------------- ALT text Validation ---------------- */
 
             List<ImageAltData> imageAltResult = extractImagesWithAlt(document);
+            int altTextCount = 0;
             for (ImageAltData data : imageAltResult) {
-            	System.out.println("$$$ altText: " + data.altText);
+            	System.out.println("$$$ pageNumber: " + data.pageNumber + ", altText: " + data.altText + ", mcid: " + data.mcid);
+            	if (data.altText != null) {
+            		altTextCount++;
+            	}
             }
 
-        }
+            if (totalImages == altTextCount) {
+            	issues.add(new AccessibilityIssue(
+                        "1.1.1", "A",
+                        "All Images have ALT texts",
+                        "PASS"));
+            } else {
+            	issues.add(new AccessibilityIssue(
+                        "1.1.1", "A",
+                        "ALT texts missing for " + (totalImages - altTextCount) + " out of " + totalImages + " images",
+                        "FAIL"));
+            }
 
         issues.sort(Comparator.comparing(AccessibilityIssue::getWcagCriterion));
 
@@ -361,45 +329,11 @@ public class PdfWcagValidator {
         return result;
     }
 
-    private static String extractAltText(PDStructureTreeRoot root) {
-
-        if (root == null) return null;
-
-        for (Object kid : root.getKids()) {
-            if (kid instanceof PDStructureElement element) {
-            	System.out.println("### Type: " + element.getStructureType() + ", ALT: " + element.getAlternateDescription());
-                if ("Figure".equals(element.getStructureType())) {
-
-                    COSBase alt = element.getCOSObject().getDictionaryObject(COSName.ALT);
-                    if (alt != null) {
-                        return alt.toString();
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-
-    private static String normalize(String text) {
-        return text.toLowerCase().replaceAll("[^a-z0-9 ]", " ");
-    }
-
     public static String checkAltText(String altText) {
 
     	System.out.println("altText: " + altText);
         if (altText == null || altText.isBlank()) {
-            return "UNKNOWN";
-        }
-
-        String normalized = normalize(altText);
-        System.out.println("normalized: " + normalized);
-
-        for (String keyword : VIOLENCE_KEYWORDS) {
-            if (normalized.contains(keyword)) {
-                return "WARN";
-            }
+            return "WARN";
         }
 
         return "PASS";
