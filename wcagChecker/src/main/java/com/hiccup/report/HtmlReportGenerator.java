@@ -17,99 +17,109 @@ public class HtmlReportGenerator {
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(output))) {
 
-            writer.write("""
-                <html>
-                <head>
-                  <title>PDF WCAG Accessibility Report</title>
-                  <style>
-                    body { font-family: Arial; }
-                    table { border-collapse: collapse; width: 100%; }
-                    th, td { border: 1px solid #ccc; padding: 8px; }
-                    th { background-color: #f4f4f4; }
-                    .PASS { color: green; }
-                    .FAIL { color: red; }
-                    .WARN { color: orange; }
-                  </style>
-                </head>
-                <body>
-                <h1>WCAG 2.1 Accessibility Report</h1>
-                """);
+            StringBuilder header = new StringBuilder();
+            header.append("<html>\n")
+                  .append("<head>\n")
+                  .append("  <title>PDF WCAG Accessibility Report</title>\n")
+                  .append("  <style>\n")
+                  .append("    body { font-family: Arial; }\n")
+                  .append("    table { border-collapse: collapse; width: 100%; }\n")
+                  .append("    th, td { border: 1px solid #ccc; padding: 8px; }\n")
+                  .append("    th { background-color: #f4f4f4; }\n")
+                  .append("    .PASS { color: green; }\n")
+                  .append("    .FAIL { color: red; }\n")
+                  .append("    .WARN { color: orange; }\n")
+                  .append("  </style>\n")
+                  .append("</head>\n")
+                  .append("<body>\n")
+                  .append("<h1>WCAG 2.1 Accessibility Report</h1>\n");
+            writer.write(header.toString());
             
             writer.write(String.format(
                     "<h2>File: %s</h2>",
                     pdf.getName()
             ));
             
-            writer.write("""
-                <table>
-                  <tr>
-                    <th>WCAG Criterion</th>
-                    <th>Level</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                  </tr>
-                """);
+            StringBuilder tableHeader = new StringBuilder();
+            tableHeader.append("<table>\n")
+                       .append("  <tr>\n")
+                       .append("    <th>WCAG Criterion</th>\n")
+                       .append("    <th>Level</th>\n")
+                       .append("    <th>Description</th>\n")
+                       .append("    <th>Status</th>\n")
+                       .append("  </tr>\n");
+            writer.write(tableHeader.toString());
 
             for (AccessibilityIssue issue : issues) {
-                writer.write(String.format(
-                        "<tr><td>%s</td><td>%s</td><td>%s</td><td class='%s'>%s</td></tr>",
-                        issue.getWcagCriterion(),
-                        issue.getLevel(),
-                        issue.getDescription(),
-                        issue.getStatus(),
-                        issue.getStatus()
-                ));
+                if (issue.getDescription().startsWith("ALT texts missing")) {
+                    StringBuilder trBuilder = new StringBuilder();
+                    trBuilder.append("<tr><td>")
+                        .append(issue.getWcagCriterion())
+                        .append("</td><td>")
+                        .append(issue.getLevel())
+                        .append("</td><td>")
+                        .append(issue.getDescription())
+                        .append(generateMissingAltSection(images))
+                        .append("</td><td class='")
+                        .append(issue.getStatus())
+                        .append("'>")
+                        .append(issue.getStatus())
+                        .append("</td></tr>");
+                    writer.write(trBuilder.toString());
+                } else {
+                    writer.write(String.format(
+                            "<tr><td>%s</td><td>%s</td><td>%s</td><td class='%s'>%s</td></tr>",
+                            issue.getWcagCriterion(),
+                            issue.getLevel(),
+                            issue.getDescription(),
+                            issue.getStatus(),
+                            issue.getStatus()
+                    ));
+                }
             }
 
-            writer.write("""
-                    </table>
-                    """);
+            // close table
+            writer.write("</table>\n");
             
-            writer.write(generateImageSection(images));
-
-            writer.write("""
-                </table>
-                <p><b>Note:</b> This report covers automated WCAG checks only.
-                Manual accessibility review is required.</p>
-                </body>
-                </html>
-                """);
+            StringBuilder note = new StringBuilder();
+            note.append("<p><b>Note:</b> This report covers automated WCAG checks only.\n")
+                .append("Manual accessibility review is required.</p>\n")
+                .append("</body>\n")
+                .append("</html>\n");
+            writer.write(note.toString());
         }
     }
     
-    public static String generateImageSection(List<ImageAltData> images) {
+    public static String generateMissingAltSection(List<ImageAltData> images) {
 
         StringBuilder html = new StringBuilder();
 
-        html.append("<h2>Image Accessibility Report</h2>");
+        // Foldable section
+        html.append("<details style='margin-top:10px;'>");
+        html.append("<summary style='cursor:pointer; font-weight:bold;'>")
+            .append("View all PDF Images")
+            .append("</summary>");
+
+        html.append("<br/>");
+
         html.append("<table border='1' style='border-collapse: collapse;'>");
 
         html.append("<tr>")
             .append("<th>Page</th>")
             .append("<th>Image</th>")
             .append("<th>ALT Text</th>")
-            .append("<th>Status</th>")
             .append("</tr>");
 
         for (ImageAltData data : images) {
 
             String base64 = ImageUtil.toBase64(data.image);
 
-            String altText = (data.altText != null) ? data.altText : "MISSING";
-
-            String status;
-            if (data.altText == null || data.altText.isBlank()) {
-                status = "FAIL";
-            } else {
-                status = "PASS";
-            }
-
             html.append("<tr>");
 
             // Page number
             html.append("<td>").append(data.pageNumber).append("</td>");
 
-            // Image
+            // Image preview
             if (base64 != null) {
                 html.append("<td>")
                     .append("<img src='data:image/png;base64,")
@@ -121,18 +131,17 @@ public class HtmlReportGenerator {
             }
 
             // ALT text
-            html.append("<td>").append(escapeHtml(altText)).append("</td>");
-
-            // Status
-            html.append("<td class='").append(status).append("'>").append(status).append("</td>");
+            html.append("<td style='color:red;'>MISSING</td>");
 
             html.append("</tr>");
         }
 
         html.append("</table>");
+        html.append("</details>");
 
         return html.toString();
     }
+
 
     public static String escapeHtml(String text) {
         if (text == null) return "";
