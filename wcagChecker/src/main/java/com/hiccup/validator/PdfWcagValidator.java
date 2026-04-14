@@ -80,17 +80,6 @@ public class PdfWcagValidator {
 
             }
 
-            /* ---------------- WCAG 1.4.5 – Images of Text ---------------- */
-
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extractedText = stripper.getText(document);
-            if (extractedText.trim().isEmpty()) {
-                issues.add(new AccessibilityIssue(
-                        "1.4.5", "AA",
-                        "PDF appears image-only (likely scanned)",
-                        "FAIL"));
-            }
-
             /* ---------------- WCAG 2.4.2 – Page Titled ---------------- */
 
             String title = document.getDocumentInformation().getTitle();
@@ -107,21 +96,15 @@ public class PdfWcagValidator {
                     "Document language specified",
                     (lang == null || lang.isBlank()) ? "FAIL" : "PASS"));
 
+
+            PDFTextStripper stripper = new PDFTextStripper();
+            String extractedText = stripper.getText(document);
             /* ---------------- WCAG 1.4.4 – Resize Text ---------------- */
 
             issues.add(new AccessibilityIssue(
                     "1.4.4", "AA",
                     "Text content extractable (supports resize/zoom)",
                     extractedText.trim().isEmpty() ? "FAIL" : "PASS"));
-
-            /* ---------------- WCAG 1.4.5 – Images of Text ---------------- */
-
-            if (extractedText.trim().isEmpty()) {
-                issues.add(new AccessibilityIssue(
-                        "1.4.5", "AA",
-                        "PDF appears image-only (likely scanned)",
-                        "FAIL"));
-            }
 
             /* ---------------- WCAG 2.1.1 – Keyboard Accessible ---------------- */
 
@@ -201,42 +184,53 @@ public class PdfWcagValidator {
                 }
             }
 
-            /* ---------------- Image Presence ---------------- */
-
-            if (totalImages == 0) {
-                issues.add(new AccessibilityIssue(
-                        "1.1.1", "A",
-                        "No images found in document",
-                        "PASS"));
-            } else {
-                issues.add(new AccessibilityIssue(
-                        "1.1.1", "A",
-                        "Images detected in document: " + totalImages,
-                        "INFO"));
-            }
-
-            /* ---------------- Image-only PDF ---------------- */
+            /* ---------------- WCAG 1.4.5 – Image-only PDF or images uses as text ---------------- */
 
             if (possibleImageOnly && totalImages > 0) {
                 issues.add(new AccessibilityIssue(
                         "1.4.5", "AA",
                         "PDF appears to be image-only (scanned document)",
                         "FAIL"));
+            } else if (totalImages > 0 && extractedText.length() < 50) {
+                issues.add(new AccessibilityIssue(
+                        "1.4.5", "AA",
+                        "Very little text detected → possible image-based content",
+                        "WARN"));
             }
 
-            /* ---------------- Alt Text (Heuristic) ---------------- */
+            /* ---------------- ALT text Validation ---------------- */
 
-            if (totalImages > 0) {
-                if (structureRoot == null) {
+            if (totalImages == 0) {
+            	issues.add(new AccessibilityIssue(
+                        "1.1.1", "A",
+                        "No images found in document",
+                        "PASS"));
+            } else {
+            	if (structureRoot == null) {
                     issues.add(new AccessibilityIssue(
                             "1.1.1", "A",
                             "Images present but no structure tree → alt text not possible",
                             "FAIL"));
-                } else {
-                    issues.add(new AccessibilityIssue(
+                }
+
+            	List<ImageAltData> imageAltResult = extractImagesWithAlt(document);
+                int altTextCount = 0;
+                for (ImageAltData data : imageAltResult) {
+                	if (data.altText != null) {
+                		altTextCount++;
+                	}
+                }
+
+                if (totalImages == altTextCount) {
+                	issues.add(new AccessibilityIssue(
                             "1.1.1", "A",
-                            "Images present → alt text must be manually verified",
-                            "WARN"));
+                            "All Images have ALT texts",
+                            "PASS"));
+                } else {
+                	issues.add(new AccessibilityIssue(
+                            "1.1.1", "A",
+                            "ALT texts missing for " + (totalImages - altTextCount) + " out of " + totalImages + " images",
+                            "FAIL"));
                 }
             }
 
@@ -249,56 +243,6 @@ public class PdfWcagValidator {
                         "WARN"));
             }*/
 
-            /* ---------------- Images used as text (Heuristic) ---------------- */
-
-            if (totalImages > 0 && !hasText) {
-                issues.add(new AccessibilityIssue(
-                        "1.4.5", "AA",
-                        "Images may be used instead of text",
-                        "FAIL"));
-            } else if (totalImages > 0 && extractedText.length() < 50) {
-                issues.add(new AccessibilityIssue(
-                        "1.4.5", "AA",
-                        "Very little text detected → possible image-based content",
-                        "WARN"));
-            }
-
-            /* ---------------- Untagged Images ---------------- */
-
-            if (structureRoot == null && totalImages > 0) {
-                issues.add(new AccessibilityIssue(
-                        "1.3.1", "A",
-                        "Images are not part of tagged content (no structure tree)",
-                        "FAIL"));
-            } else if (totalImages > 0) {
-                issues.add(new AccessibilityIssue(
-                        "1.3.1", "A",
-                        "Verify images are tagged as Figure elements",
-                        "WARN"));
-            }
-
-            /* ---------------- ALT text Validation ---------------- */
-
-            List<ImageAltData> imageAltResult = extractImagesWithAlt(document);
-            int altTextCount = 0;
-            for (ImageAltData data : imageAltResult) {
-            	System.out.println("$$$ pageNumber: " + data.pageNumber + ", altText: " + data.altText + ", mcid: " + data.mcid);
-            	if (data.altText != null) {
-            		altTextCount++;
-            	}
-            }
-
-            if (totalImages == altTextCount) {
-            	issues.add(new AccessibilityIssue(
-                        "1.1.1", "A",
-                        "All Images have ALT texts",
-                        "PASS"));
-            } else {
-            	issues.add(new AccessibilityIssue(
-                        "1.1.1", "A",
-                        "ALT texts missing for " + (totalImages - altTextCount) + " out of " + totalImages + " images",
-                        "FAIL"));
-            }
 
         issues.sort(Comparator.comparing(AccessibilityIssue::getWcagCriterion));
 
